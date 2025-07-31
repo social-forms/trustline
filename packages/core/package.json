@@ -1,0 +1,17 @@
+{
+  "name": "@trustline/core",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@scure/starknet": "^1.1.2",
+    "starknet": "^6.6.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3"
+  }
+}
