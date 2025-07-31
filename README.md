@@ -1,3 +1,5 @@
+<img width="1500" height="500" alt="trustline-github-banner" src="https://github.com/user-attachments/assets/7ff25e48-b62d-4b38-ae35-ca9c8f20e05f" />
+
 # Trustline
 
 Trustline is the open-source data integrity layer for [Social Forms](https://socialforms.so), a platform that transforms traditional web forms into interactive, story-like experiences.
