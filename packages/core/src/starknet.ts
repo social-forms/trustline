@@ -1,19 +1,55 @@
-import { Account, RpcProvider, CallData, Contract } from 'starknet';
-import { UserSession } from './types';
-import { abi } from './abi';
+import { Account, RpcProvider, CallData, Contract, ec, hash, stark } from 'starknet'
+import { UserSession } from './types'
+import { abi } from './abi'
 
 /**
- * Initializes a user session.
- * For this implementation, it creates a new random burner wallet.
+ * Creates and deploys a new burner account on the local devnet.
+ * This function is designed for local development and testing purposes.
+ * @param provider An RPC provider instance.
+ * @returns A fully deployed and funded Account object.
+ */
+async function createBurnerAccount(provider: RpcProvider): Promise<Account> {
+  const privateKey = stark.randomAddress()
+  const publicKey = ec.starkCurve.getStarkKey(privateKey)
+  // This is a Cairo 1 account class hash, compatible with V3 transactions.
+  const accountClassHash = '0x05b4b537eaa2399e3aa99c4e2e0208ebd6c71bc1467938cd52c798c601e43564'
+
+  const address = hash.calculateContractAddressFromHash(
+    publicKey,
+    accountClassHash,
+    CallData.compile({ publicKey }),
+    0
+  )
+
+  // Fund the account with 0.01 STRK. This amount is small enough to be a safe
+  // JavaScript number, but more than enough to cover deployment fees.
+  await fetch('http://127.0.0.1:5050/mint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      address,
+      amount: 10000000000000000, // 0.01 STRK
+      unit: 'FRI'
+    })
+  })
+
+  const account = new Account(provider, address, privateKey, '1')
+
+  await account.deployAccount({
+    classHash: accountClassHash,
+    constructorCalldata: CallData.compile({ publicKey }),
+    addressSalt: publicKey
+  })
+
+  return account
+}
+
+/**
+ * Initializes a user session by creating a new, temporary burner wallet.
  */
 export async function initializeSession(provider: RpcProvider): Promise<UserSession> {
-  const privateKey = '0x' + Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex');
-  // This uses a pre-funded devnet account address for demo purposes.
-  // In a real application, this account would need to be funded.
-  const address = "0x35b35af6150413cd9ed8bc36f2c2aa627edcb528b4d1c60b2b106c092123575";
-  const account = new Account(provider, address, privateKey);
-
-  return { account };
+  const account = await createBurnerAccount(provider)
+  return { account }
 }
 
 /**
@@ -27,9 +63,9 @@ export async function storeFingerprint(
   const { transaction_hash } = await session.account.execute({
     contractAddress,
     entrypoint: 'store_fingerprint',
-    calldata: CallData.compile({ fingerprint }),
-  });
-  return transaction_hash;
+    calldata: CallData.compile({ fingerprint })
+  })
+  return transaction_hash
 }
 
 /**
@@ -40,7 +76,7 @@ export async function verifyFingerprint(
   contractAddress: string,
   fingerprint: string
 ): Promise<boolean> {
-  const contract = new Contract(abi, contractAddress, provider);
-  const result = await contract.verify_fingerprint(fingerprint);
-  return Boolean(result);
+  const contract = new Contract(abi, contractAddress, provider)
+  const result = await contract.verify_fingerprint(fingerprint)
+  return Boolean(result)
 }

@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@scure/starknet": "^1.1.2",
-    "starknet": "^6.6.0"
+    "starknet": "^7.6.4"
   },
   "devDependencies": {
     "tsup": "^8.0.2",
