@@ -1,6 +1,9 @@
 # Visit https://foundry-rs.github.io/starknet-foundry/appendix/snfoundry-toml.html
 # and https://foundry-rs.github.io/starknet-foundry/projects/configuration.html for more information
 
+[sncast.devnet]
+url = "http://127.0.0.1:5050/rpc"
+
 # [sncast.default]                                         # Define a profile name
 # url = "https://starknet-sepolia.public.blastapi.io/rpc/v0_8" # Url of the RPC provider
 # accounts-file = "../account-file"                        # Path to the file with the account data

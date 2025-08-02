@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalEnv": ["CONTRACT_ADDRESS", "RPC_URL", "RELAYER_ADDRESS", "RELAYER_PRIVATE_KEY", "SIERRA_FILE_PATH"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
