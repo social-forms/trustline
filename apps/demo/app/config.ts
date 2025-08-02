@@ -1,8 +1,14 @@
-// apps/demo/app/config.ts
 export const appConfig = {
-  contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
-  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
-};
+  contractAddress: process.env.CONTRACT_ADDRESS,
+  rpcUrl: process.env.RPC_URL,
+  relayerAddress: process.env.RELAYER_ADDRESS,
+  relayerPrivateKey: process.env.RELAYER_PRIVATE_KEY,
+  sierraFilePath: process.env.SIERRA_FILE_PATH
+}
 
-export const isConfigurationValid = 
-  appConfig.contractAddress && appConfig.rpcUrl;
+export const isConfigurationValid =
+  !!appConfig.contractAddress &&
+  !!appConfig.rpcUrl &&
+  !!appConfig.relayerAddress &&
+  !!appConfig.relayerPrivateKey &&
+  !!appConfig.sierraFilePath

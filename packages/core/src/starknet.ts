@@ -1,80 +1,100 @@
-import { Account, RpcProvider, CallData, Contract, ec, hash, stark } from 'starknet'
-import { UserSession } from './types'
-import { abi } from './abi'
+import {
+  Account,
+  RpcProvider,
+  CallData,
+  Contract,
+  ec,
+  hash,
+  stark,
+  Signature,
+  json,
+  RawCalldata,
+  shortString
+} from 'starknet'
+import { UserSession, RelayerSession } from './types'
 
-/**
- * Creates and deploys a new burner account on the local devnet.
- * This function is designed for local development and testing purposes.
- * @param provider An RPC provider instance.
- * @returns A fully deployed and funded Account object.
- */
-async function createBurnerAccount(provider: RpcProvider): Promise<Account> {
+export function initializeUserSession(): UserSession {
   const privateKey = stark.randomAddress()
   const publicKey = ec.starkCurve.getStarkKey(privateKey)
-  // This is a Cairo 1 account class hash, compatible with V3 transactions.
-  const accountClassHash = '0x05b4b537eaa2399e3aa99c4e2e0208ebd6c71bc1467938cd52c798c601e43564'
-
-  const address = hash.calculateContractAddressFromHash(
-    publicKey,
-    accountClassHash,
-    CallData.compile({ publicKey }),
-    0
-  )
-
-  // Fund the account with 0.01 STRK. This amount is small enough to be a safe
-  // JavaScript number, but more than enough to cover deployment fees.
-  await fetch('http://127.0.0.1:5050/mint', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      address,
-      amount: 10000000000000000, // 0.01 STRK
-      unit: 'FRI'
-    })
-  })
-
-  const account = new Account(provider, address, privateKey, '1')
-
-  await account.deployAccount({
-    classHash: accountClassHash,
-    constructorCalldata: CallData.compile({ publicKey }),
-    addressSalt: publicKey
-  })
-
-  return account
+  return { privateKey, publicKey }
 }
 
-/**
- * Initializes a user session by creating a new, temporary burner wallet.
- */
-export async function initializeSession(provider: RpcProvider): Promise<UserSession> {
-  const account = await createBurnerAccount(provider)
+export function initializeRelayerSession(
+  provider: RpcProvider,
+  relayerAddress: string,
+  relayerPrivateKey: string
+): RelayerSession {
+  const account = new Account(provider, relayerAddress, relayerPrivateKey)
   return { account }
 }
 
-/**
- * Calls the `store_fingerprint` function on the smart contract.
- */
-export async function storeFingerprint(
-  session: UserSession,
+export async function getNonce(
+  provider: RpcProvider,
   contractAddress: string,
-  fingerprint: string
+  userPublicKey: string,
+  abi: any
 ): Promise<string> {
-  const { transaction_hash } = await session.account.execute({
+  const contract = new Contract(abi, contractAddress, provider)
+  const nonce = await contract.get_nonce(userPublicKey)
+  return nonce.toString()
+}
+
+export async function signFingerprint(
+  provider: RpcProvider,
+  userPrivateKey: string,
+  fingerprint: string,
+  nonce: string,
+  userPublicKey: string,
+  relayerAddress: string
+): Promise<Signature> {
+  const chainId = await provider.getChainId()
+
+  // This hashing logic must match the Cairo contract's sequential Pedersen hash.
+  const elementsToHash = [
+    chainId,
+    relayerAddress,
+    shortString.encodeShortString('store_fingerprint'),
+    userPublicKey,
+    fingerprint,
+    nonce
+  ]
+
+  const messageHash = elementsToHash.reduce((acc, element) => ec.starkCurve.pedersen(acc, element), '0x0')
+
+  return ec.starkCurve.sign(messageHash, userPrivateKey)
+}
+
+export async function storeFingerprintRelayed(
+  relayerSession: RelayerSession,
+  contractAddress: string,
+  userPublicKey: string,
+  fingerprint: string,
+  signature: Signature
+): Promise<string> {
+  // Convert signature to array format
+  const sigArray = Array.isArray(signature) ? signature : [signature.r, signature.s]
+
+  if (!sigArray[0] || !sigArray[1]) {
+    throw new Error('Invalid signature format')
+  }
+
+  const { transaction_hash } = await relayerSession.account.execute({
     contractAddress,
-    entrypoint: 'store_fingerprint',
-    calldata: CallData.compile({ fingerprint })
+    entrypoint: 'store_fingerprint_relayed',
+    calldata: CallData.compile({
+      signer_public_key: userPublicKey,
+      fingerprint,
+      signature: [sigArray[0].toString(), sigArray[1].toString()]
+    })
   })
   return transaction_hash
 }
 
-/**
- * Calls the `verify_fingerprint` view function on the smart contract.
- */
 export async function verifyFingerprint(
   provider: RpcProvider,
   contractAddress: string,
-  fingerprint: string
+  fingerprint: string,
+  abi: any
 ): Promise<boolean> {
   const contract = new Contract(abi, contractAddress, provider)
   const result = await contract.verify_fingerprint(fingerprint)

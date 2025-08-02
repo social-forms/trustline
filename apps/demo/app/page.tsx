@@ -1,10 +1,7 @@
-'use client'
-
-import { SubmissionForm } from '../components/SubmissionForm'
-import { Submission, SubmissionsList } from '../components/SubmissionsList'
-import { useIntegrity } from '@trustline/hooks'
 import { appConfig, isConfigurationValid } from './config'
-import { useState } from 'react'
+import IntegrityClient from '../components/IntegrityClient'
+import fs from 'fs'
+import { json } from 'starknet'
 
 export default function HomePage() {
   if (!isConfigurationValid) {
@@ -17,66 +14,16 @@ export default function HomePage() {
     )
   }
 
-  return <IntegrityApp />
-}
+  const compiledContract = json.parse(fs.readFileSync(appConfig.sierraFilePath!).toString('ascii'))
+  const abi = compiledContract.abi
 
-function IntegrityApp() {
-  const [submissions, setSubmissions] = useState<Array<Submission>>([])
-
-  const { handleSubmit, verifySubmission, isInitializing } = useIntegrity({
+  const integrityConfig = {
     contractAddress: appConfig.contractAddress!,
-    rpcUrl: appConfig.rpcUrl!
-  })
-
-  if (isInitializing) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Initializing User Session...</div>
-      </div>
-    )
+    rpcUrl: appConfig.rpcUrl!,
+    relayerAddress: appConfig.relayerAddress!,
+    relayerPrivateKey: appConfig.relayerPrivateKey!,
+    abi: abi
   }
 
-  const onSubmit = async (data: { [key: string]: number | string | boolean }) => {
-    try {
-      const { fingerprint, transactionHash } = await handleSubmit(data)
-      const submission = { id: Date.now(), data, fingerprint, transactionHash }
-      setSubmissions([...submissions, submission])
-    } catch (error) {
-      console.error(error)
-      alert(
-        'An error occurred while submitting the transaction. Please check the console for more details.'
-      )
-    }
-  }
-
-  const onVerify = async (fingerprint: string) => {
-    try {
-      const { isVerified } = await verifySubmission(fingerprint)
-      alert(isVerified ? 'Verified' : 'Not Verified')
-    } catch (error) {
-      console.error(error)
-      alert(
-        'An error occurred while verifying the submission. Please check the console for more details.'
-      )
-    }
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto my-8">
-      <header className="mb-10 text-center">
-        <h1 className="text-4xl font-bold">On-Chain Data Integrity</h1>
-      </header>
-      <main className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        <section>
-          <h2 className="mb-4 text-2xl font-semibold text-center">Submit New Data</h2>
-          <SubmissionForm onSubmit={onSubmit} />
-        </section>
-        <hr className="my-8 border-t border-gray-200 md:hidden" />
-        <section>
-          <h2 className="mb-4 text-2xl font-semibold text-center">Submission History</h2>
-          <SubmissionsList submissions={submissions} onVerify={onVerify} />
-        </section>
-      </main>
-    </div>
-  )
+  return <IntegrityClient {...integrityConfig} />
 }

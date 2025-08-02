@@ -1,26 +1,93 @@
-import { generateFingerprint as generate } from './fingerprint'
-import { initializeSession as init, storeFingerprint as store, verifyFingerprint as verify } from './starknet'
-import { CoreConfig, ICoreAPI, UserSession } from './types'
-import { RpcProvider } from 'starknet'
+import {
+  generateFingerprint as generateFingerprintInternal
+} from './fingerprint';
+import {
+  initializeUserSession as initializeUserSessionInternal,
+  initializeRelayerSession as initializeRelayerSessionInternal,
+  storeFingerprintRelayed,
+  verifyFingerprint as verifyFingerprintInternal,
+  getNonce,
+  signFingerprint,
+} from './starknet';
+import {
+  CoreConfig,
+  ICoreAPI,
+  RelayerSession,
+  UserSession,
+} from './types';
+import { RpcProvider } from 'starknet';
 
-/**
- * Factory function to create an instance of the Core API.
- * @param config The configuration object with provider and contract address.
- * @returns An object conforming to the ICoreAPI interface.
- */
-export function createCore(config: CoreConfig): ICoreAPI {
-  return {
-    generateFingerprint: (data: object) => generate(data),
+export * from './types';
 
-    initializeSession: () => init(config.provider as RpcProvider),
+class Core implements ICoreAPI {
+  private contractAddress: string;
+  private provider: RpcProvider;
+  private abi: any;
 
-    storeFingerprint: (session: UserSession, fingerprint: string) =>
-      store(session, config.contractAddress, fingerprint),
+  constructor(config: CoreConfig) {
+    this.contractAddress = config.contractAddress;
+    this.provider = config.provider;
+    this.abi = config.abi;
+  }
 
-    verifyFingerprint: (fingerprint: string) =>
-      verify(config.provider as RpcProvider, config.contractAddress, fingerprint)
+  public initializeUserSession(): UserSession {
+    return initializeUserSessionInternal();
+  }
+
+  public initializeRelayerSession(
+    relayerAddress: string,
+    relayerPrivateKey: string
+  ): RelayerSession {
+    return initializeRelayerSessionInternal(
+      this.provider,
+      relayerAddress,
+      relayerPrivateKey
+    );
+  }
+
+  public generateFingerprint(data: object): string {
+    return generateFingerprintInternal(data);
+  }
+
+  public async storeFingerprint(
+    relayerSession: RelayerSession,
+    userSession: UserSession,
+    fingerprint: string
+  ): Promise<string> {
+    const nonce = await getNonce(
+      this.provider,
+      this.contractAddress,
+      userSession.publicKey,
+      this.abi
+    );
+    const signature = await signFingerprint(
+      this.provider,
+      userSession.privateKey,
+      fingerprint,
+      nonce,
+      userSession.publicKey,
+      relayerSession.account.address
+    );
+
+    return storeFingerprintRelayed(
+      relayerSession,
+      this.contractAddress,
+      userSession.publicKey,
+      fingerprint,
+      signature
+    );
+  }
+
+  public async verifyFingerprint(fingerprint: string): Promise<boolean> {
+    return verifyFingerprintInternal(
+      this.provider,
+      this.contractAddress,
+      fingerprint,
+      this.abi
+    );
   }
 }
 
-export * from './types'
-export { RpcProvider } from 'starknet'
+export function createCore(config: CoreConfig): ICoreAPI {
+  return new Core(config);
+}
