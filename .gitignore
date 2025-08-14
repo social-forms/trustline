@@ -37,3 +37,5 @@ yarn-error.log*
 
 # ui
 dist/
+packages/contracts/prefunded_account.json
+packages/contracts/prefunded_keystore.json
