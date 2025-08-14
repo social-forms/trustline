@@ -37,5 +37,12 @@ yarn-error.log*
 
 # ui
 dist/
+
+# Starknet/Blockchain build artifacts
+packages/contracts/target/
+*.contract_class.json
+*.starknet_artifacts.json
+
+# Starknet account files (CRITICAL - contains private keys)
 packages/contracts/prefunded_account.json
 packages/contracts/prefunded_keystore.json
